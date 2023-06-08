@@ -20,7 +20,7 @@ on:
         type: string
         description: URL to upload to
         required: true
-      environment:
+      gh_environment:
         type: string
         description: GitHub environment to use #could be important for trusted publishing
       skip_existing:
@@ -44,7 +44,8 @@ jobs:
     name: Upload to PyPI
     runs-on: ubuntu-latest
     environment:
-      name: ${{ inputs.environment }} #TODO what happens if it is empty?
+      name: test_pypi
+      # name: ${{ inputs.gh_environment }} #TODO what happens if it is empty?
       #url: https://test.pypi.org/project/ncrystal/ 
     permissions:
       id-token: write
@@ -56,6 +57,9 @@ jobs:
 
       - uses: pypa/gh-action-pypi-publish@v1.8.6
         with:
-          repository-url: ${{ inputs.destination_url }}
-          skip-existing: ${{ inputs.skip_existing }}
-          verbose: true #TODO for debugging
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+          verbose: true
+          # repository-url: ${{ inputs.destination_url }}
+          # skip-existing: ${{ inputs.skip_existing }}
+          # verbose: true #TODO for debugging
