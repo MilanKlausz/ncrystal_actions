@@ -64,7 +64,14 @@ jobs:
       - name: Build sdist
         run: pipx run build --sdist
 
+      - name: Test sdist
+        id: test-sdist
+        run: |
+          python3 -mpip install dist/*.tar.gz
+          . test/run_tests.sh
+
       - uses: actions/upload-artifact@v3
+        if: steps.test-sdist.outcome == 'success'
         with:
           path: dist/*.tar.gz
 
