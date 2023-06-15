@@ -3,32 +3,35 @@ name: Build and deploy to PyPI
 on:
   # workflow_dispatch:
   #   inputs:
-  #     destination_url:
+  #     DESTINATION_URL:
   #       type: string
   #       description: URL to upload to
-  #     environment:
+  #     ENVIRONMENT:
   #       type: string
   #       description: GitHub environment to use #could be important for trusted publishing
-  #     skip_existing:
+  #     SKIP_EXISTING:
   #       type: boolean
   #       description: Allow failure due do duplicate when uploading
   #       default: false
 
   workflow_call:
     inputs:
-      destination_url:
+      DESTINATION_URL:
         type: string
         description: URL to upload to
         required: true
-      gh_environment:
+      ENVIRONMENT:
         type: string
         description: GitHub environment to use #could be important for trusted publishing
-      skip_existing:
+      SKIP_EXISTING:
         type: boolean
         description: Allow failure due do duplicate when uploading
         default: false
+    secrets:
+      PYPI_API_TOKEN:
+        required: true
 jobs:
-  check_artifact: #TODO probably only for development
+  check_artifact:
     name: List artifact content
     runs-on: ubuntu-latest
     steps:
@@ -44,11 +47,8 @@ jobs:
     name: Upload to PyPI
     runs-on: ubuntu-latest
     environment:
-      name: test_pypi
-      # name: ${{ inputs.gh_environment }} #TODO what happens if it is empty?
-      #url: https://test.pypi.org/project/ncrystal/ 
-    permissions:
-      id-token: write
+      name: ${{ inputs.ENVIRONMENT }} #TODO what happens if it is empty?
+      #url: https://test.pypi.org/project/ncrystal/ #TODO
     steps:
       - uses: actions/download-artifact@v3
         with:
@@ -57,9 +57,6 @@ jobs:
 
       - uses: pypa/gh-action-pypi-publish@v1.8.6
         with:
-          repository-url: https://test.pypi.org/legacy/
-          skip-existing: true
-          verbose: true
-          # repository-url: ${{ inputs.destination_url }}
-          # skip-existing: ${{ inputs.skip_existing }}
-          # verbose: true #TODO for debugging
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          repository-url: ${{ inputs.DESTINATION_URL }}
+          skip-existing: ${{ inputs.SKIP_EXISTING }}
