@@ -1,19 +1,6 @@
 name: Build and deploy to PyPI
 
 on:
-  # workflow_dispatch:
-  #   inputs:
-  #     DESTINATION_URL:
-  #       type: string
-  #       description: URL to upload to
-  #     ENVIRONMENT:
-  #       type: string
-  #       description: GitHub environment to use #could be important for trusted publishing
-  #     SKIP_EXISTING:
-  #       type: boolean
-  #       description: Allow failure due do duplicate when uploading
-  #       default: false
-
   workflow_call:
     inputs:
       DESTINATION_URL:
@@ -22,7 +9,7 @@ on:
         required: true
       ENVIRONMENT:
         type: string
-        description: GitHub environment to use #could be important for trusted publishing
+        description: GitHub environment to use
       SKIP_EXISTING:
         type: boolean
         description: Allow failure due do duplicate when uploading
@@ -38,7 +25,7 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           name: artifact
-          path: dist #unpacks default artifact into dist/
+          path: dist
 
       - name: list artifact content
         run: ls -l dist
@@ -48,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: ${{ inputs.ENVIRONMENT }} #TODO what happens if it is empty?
-      #url: https://test.pypi.org/project/ncrystal/ #TODO
+      url: https://test.pypi.org/project/ncrystal/ #TODO should be env var
     steps:
       - uses: actions/download-artifact@v3
         with:
