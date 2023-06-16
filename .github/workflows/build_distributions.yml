@@ -47,6 +47,11 @@ jobs:
           CIBW_BUILD: cp38-*
           # CIBW_BUILD: cp{37,38,39,310,311}-*
 
+      - name: Override wheel tags
+        run: |
+          python3 -mpip install wheel
+          wheel tags --python-tag=py3 --abi-tag=none --remove ./wheelhouse/*.whl
+
       - uses: actions/upload-artifact@v3
         with:
           path: ./wheelhouse/*.whl
@@ -76,7 +81,7 @@ jobs:
 
   check_artifact:
     name: List artifact content
-    # needs: [build_wheels, build_sdist]
+    # needs: [build_wheels, build_sdist] #TODO final version
     needs: [build_sdist]
     runs-on: ubuntu-latest
     steps:
