@@ -45,7 +45,7 @@ jobs:
         env:
           CIBW_BUILD_VERBOSITY: 1
           CIBW_BUILD: cp38-*
-          # CIBW_BUILD: cp{37,38,39,310,311}-*
+          CIBW_ARCHS_MACOS: "x86_64 universal2 arm64"
 
       - name: Override wheel tags
         run: |
