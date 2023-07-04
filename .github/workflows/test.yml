@@ -26,25 +26,19 @@ jobs:
       - name: Generate Matrix
         id: create-matrix
         run: |
-          MATRIX=$(python3 -c "import subprocess, json; output1 = subprocess.check_output('cibuildwheel --print-build-identifiers --platform linux', shell=True).decode().splitlines(); output2 = subprocess.check_output('cibuildwheel --print-build-identifiers --platform macos', shell=True).decode().splitlines(); result = [{'identifier': item, 'os': 'ubuntu-latest'} for item in output1] + [{'identifier': item, 'os': 'macos-latest'} for item in output2]; print(json.dumps(result));")
+          MATRIX=$(python3 -c "import subprocess, json; \
+          linux_identifiers = subprocess.check_output('cibuildwheel --print-build-identifiers --platform linux', shell=True).decode().splitlines(); \
+          macos_identifiers = subprocess.check_output('cibuildwheel --print-build-identifiers --platform macos', shell=True).decode().splitlines(); \
+          result = [{'os': 'ubuntu-latest', 'identifier': i} for i in linux_identifiers] + \
+                   [{'os': 'macos-latest',  'identifier': i} for i in macos_identifiers]; \
+          print(json.dumps(result));")
           echo "setup_matrix={\"include\":$MATRIX}" >> $GITHUB_OUTPUT
-          # echo "setup_matrix={\"include\":[$MATRIX]}" >> $GITHUB_OUTPUT
-          # echo "setup_matrix=$MATRIX" >> $GITHUB_OUTPUT
         env: 
           CIBW_BUILD: cp39-*
           # CIBW_ARCHS_MACOS: "x86_64 universal2 arm64"
           # CIBW_SKIP: pp*
     outputs:
       setups: ${{ steps.create-matrix.outputs.setup_matrix }}
-
-  # next-job:
-  #   needs: create-matrix
-  #   runs-on: ubuntu-latest
-  #   env:
-  #     matrix: ${{ fromJson(needs.create-matrix.outputs.setups) }}
-  #   steps:
-  #     - name: Echo
-  #       run: echo "done"
 
   next-job:
     needs: create-matrix
@@ -56,39 +50,3 @@ jobs:
     steps:
       - name: Echo
         run: echo ${{matrix.identifier}}
-
-# jobs:
-#   ubuntu:
-#     name: ubuntu-print-build-identifiers
-#     runs-on: ubuntu-latest
-#     steps:
-#       - uses: actions/checkout@v3
-#         with:
-#           repository: ${{ inputs.repository }}
-#           ref: ${{ inputs.branch }}
-
-#       - name: install cibuildwheel
-#         run: pip install cibuildwheel
-
-#       - name: print-build-identifiers
-#         run: |
-#           cibuildwheel --print-build-identifiers --platform linux
-#           cibuildwheel --print-build-identifiers --platform linux | wc -l
-#           cibuildwheel --print-build-identifiers --platform macos 
-#           cibuildwheel --print-build-identifiers --platform macos | wc -l
-#         env: 
-#           CIBW_ARCHS_MACOS: "x86_64 universal2 arm64"
-#           CIBW_SKIP: pp*
-  
-#       - id: set-matrix
-#         run: |
-#           MATRIX=$(
-#             {
-#               cibuildwheel --print-build-identifiers --platform linux \
-#               | pyp 'json.dumps({"only": x, "os": "ubuntu-latest"})' \
-#               && cibuildwheel --print-build-identifiers --platform macos \
-#               | pyp 'json.dumps({"only": x, "os": "macos-latest"})'
-#             } | pyp 'json.dumps(list(map(json.loads, lines)))'
-#           )
-#           echo "include=$MATRIX" | tee -a $GITHUB_OUTPUT
-#         env:
