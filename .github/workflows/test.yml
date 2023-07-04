@@ -29,9 +29,9 @@ jobs:
           MATRIX=$(python3 -c "import subprocess, json; \
           linux_identifiers = subprocess.check_output('cibuildwheel --print-build-identifiers --platform linux', shell=True).decode().splitlines(); \
           macos_identifiers = subprocess.check_output('cibuildwheel --print-build-identifiers --platform macos', shell=True).decode().splitlines(); \
-          result = [{'os': 'ubuntu-latest', 'identifier': i} for i in linux_identifiers] + \
+          setups = [{'os': 'ubuntu-latest', 'identifier': i} for i in linux_identifiers] + \
                    [{'os': 'macos-latest',  'identifier': i} for i in macos_identifiers]; \
-          print(json.dumps(result));")
+          print(json.dumps(setups));")
           echo "setup_matrix={\"include\":$MATRIX}" >> $GITHUB_OUTPUT
         env: 
           CIBW_BUILD: cp39-*
@@ -48,5 +48,9 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.create-matrix.outputs.setups) }}
     steps:
+      - uses: actions/setup-python@v4
+        name: Install Python
+        with:
+          python-version: "3.10"
       - name: Echo
         run: echo ${{matrix.identifier}}
