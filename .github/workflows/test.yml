@@ -1,0 +1,59 @@
+name: Test
+
+on: 
+  workflow_dispatch:
+    inputs:
+      repository:
+        type: string
+        description: The repository to build from
+        default: MilanKlausz/ncrystal_wheels
+      branch:
+        type: string
+        description: The repository branch to use
+        default: develop
+jobs:
+  ubuntu:
+    name: ubuntu-print-build-identifiers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          repository: ${{ inputs.repository }}
+          ref: ${{ inputs.branch }}
+
+      - name: install cibuildwheel
+        run: pip install cibuildwheel
+
+      - name: print-build-identifiers
+        run: |
+          cibuildwheel --print-build-identifiers --platform linux
+          cibuildwheel --print-build-identifiers --platform linux | wc -l
+          cibuildwheel --print-build-identifiers --platform macos 
+          cibuildwheel --print-build-identifiers --platform macos | wc -l
+        env: 
+          CIBW_ARCHS_MACOS: "x86_64 universal2 arm64"
+          CIBW_SKIP: pp*
+  # macos:
+  #   name: macos-print-build-identifiers
+  #   runs-on: macos-latest
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #       with:
+  #         repository: ${{ inputs.repository }}
+  #         ref: ${{ inputs.branch }}
+
+  #     - name: Set up Python
+  #       uses: actions/setup-python@v4
+  #       with:
+  #         python-version: "3.10"
+
+  #     - name: install cibuildwheel
+  #       run: pip install cibuildwheel
+
+  #     - name: print-build-identifiers
+  #       run: |
+  #         cibuildwheel --print-build-identifiers
+  #         cibuildwheel --print-build-identifiers | wc -l
+  #       env: 
+  #         CIBW_ARCHS_MACOS: "x86_64 universal2 arm64"
+  #         CIBW_SKIP: pp*
