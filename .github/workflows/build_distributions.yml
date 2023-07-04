@@ -1,29 +1,50 @@
-name: Build to PyPI
+name: Build and deploy to PyPI
 
-on: 
+on:
   workflow_dispatch:
     inputs:
-      repository:
+      REPOSITORY:
         type: string
         description: The repository to build from
         default: MilanKlausz/ncrystal_wheels
-      branch:
+      BRANCH:
         type: string
         description: The repository branch to use
         default: master
-      #TODO add option to controll the platforms
+      DO_DEPLOY:
+        type: boolean
+        description: Do deploying to PyPI
+        default: false
 
   workflow_call:
     inputs:
-      repository:
+      REPOSITORY:
         type: string
         description: The repository to build from
         required: true
-      branch:
+      BRANCH:
         type: string
         description: The repository branch to use
         default: master
         required: false
+      DO_DEPLOY:
+        type: boolean
+        description: Do deploying to PyPI
+        default: true
+      DESTINATION_URL:
+        type: string
+        description: URL to upload to
+        required: true
+      ENVIRONMENT:
+        type: string
+        description: GitHub environment to use
+      SKIP_EXISTING:
+        type: boolean
+        description: Allow failure due do duplicate when uploading
+        default: false
+    secrets:
+      PYPI_API_TOKEN:
+        required: true
 
 jobs:
   create-matrix:
@@ -31,12 +52,12 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          repository: ${{ inputs.repository }}
-          ref: ${{ inputs.branch }}
+          repository: ${{ inputs.REPOSITORY }}
+          ref: ${{ inputs.BRANCH }}
 
       - name: Install cibuildwheel
         run: pip install cibuildwheel
-        
+
       - name: Generate setup matrix
         id: create-matrix
         run: |
@@ -47,10 +68,10 @@ jobs:
                    [{'os': 'macos-latest',  'identifier': i} for i in macos_identifiers]; \
           print(json.dumps(setups));")
           echo "setup_matrix={\"include\":$MATRIX}" >> $GITHUB_OUTPUT
-        env: 
+        env:
           CIBW_BUILD: cp39-*
           # CIBW_ARCHS_MACOS: "x86_64 universal2 arm64"
-          # CIBW_SKIP: pp*
+          # CIBW_SKIP: pp* #TODO allow?
     outputs:
       setups: ${{ steps.create-matrix.outputs.setup_matrix }}
 
@@ -61,57 +82,68 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.create-matrix.outputs.setups) }}
+    environment:
+      name: ${{ inputs.ENVIRONMENT }} #TODO what happens if it is empty?
 
     steps:
       - uses: actions/checkout@v3
         with:
-          repository: ${{ inputs.repository }}
-          ref: ${{ inputs.branch }}
+          repository: ${{ inputs.REPOSITORY }}
+          ref: ${{ inputs.BRANCH }}
 
       - uses: actions/setup-python@v4
         name: Install Python
         with:
           python-version: "3.10"
 
-      - name: Build wheels
+      - name: Build wheel
         uses: pypa/cibuildwheel@v2.12.3
         with:
           only: ${{ matrix.identifier }}
         env:
           CIBW_BUILD_VERBOSITY: 1
 
+      - uses: pypa/gh-action-pypi-publish@v1.8.6
+        if: inputs.DO_DEPLOY
+        with:
+          packages-dir: ./wheelhouse
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          repository-url: ${{ inputs.DESTINATION_URL }}
+          skip-existing: ${{ inputs.SKIP_EXISTING }}
+
       - uses: actions/upload-artifact@v3
         with:
           path: ./wheelhouse/*.whl
           if-no-files-found: error
 
-  # build_sdist:
-  #   name: Build source distribution
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v3
-  #       with:
-  #         repository: ${{ inputs.repository }}
-  #         ref: ${{ inputs.branch }}
+  build_sdist:
+    name: Build source distribution
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          repository: ${{ inputs.REPOSITORY }}
+          ref: ${{ inputs.BRANCH }}
 
-  #     - name: Build sdist
-  #       run: pipx run build --sdist
+      - name: Build sdist
+        run: pipx run build --sdist
+      
+      - uses: pypa/gh-action-pypi-publish@v1.8.6
+        if: inputs.DO_DEPLOY
+        with:
+          packages-dir: ./dist
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          repository-url: ${{ inputs.DESTINATION_URL }}
+          skip-existing: ${{ inputs.SKIP_EXISTING }}
 
-  #     - name: Test sdist
-  #       id: test-sdist
-  #       run: |
-  #         python3 -mpip install dist/*.tar.gz
-  #         . test/run_tests.sh
-
-  #     - uses: actions/upload-artifact@v3
-  #       if: steps.test-sdist.outcome == 'success'
-  #       with:
-  #         path: dist/*.tar.gz
+      - uses: actions/upload-artifact@v3
+        with:
+          path: dist/*.tar.gz
 
   check_artifact:
     name: List artifact content
-    # needs: [build_wheels, build_sdist] #TODO final version
-    needs: [build_wheels]
+    needs: [build_wheels, build_sdist] #TODO final version
+    # needs: [build_wheels]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v3
