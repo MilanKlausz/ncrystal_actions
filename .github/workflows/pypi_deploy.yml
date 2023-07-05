@@ -1,7 +1,7 @@
 name: Build and deploy to PyPI
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: #TODO might not be neede in the end
     inputs:
       REPOSITORY:
         type: string
@@ -69,7 +69,7 @@ jobs:
           print(json.dumps(setups));")
           echo "setup_matrix={\"include\":$MATRIX}" >> $GITHUB_OUTPUT
         env:
-          CIBW_BUILD: cp39-*
+          CIBW_BUILD: cp39-* #TODO restriction for development
           # CIBW_ARCHS_MACOS: "x86_64 universal2 arm64"
           # CIBW_SKIP: pp* #TODO allow?
     outputs:
@@ -77,13 +77,11 @@ jobs:
 
   build_wheels:
     needs: create-matrix
-    name: Build wheels for ${{ matrix.identifier }}
+    name: Build ${{ matrix.identifier }} wheel
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.create-matrix.outputs.setups) }}
-    environment:
-      name: ${{ inputs.ENVIRONMENT }} #TODO what happens if it is empty?
 
     steps:
       - uses: actions/checkout@v3
@@ -92,7 +90,7 @@ jobs:
           ref: ${{ inputs.BRANCH }}
 
       - uses: actions/setup-python@v4
-        name: Install Python
+        name: Install Python #Necessary for macos because default python version is too low for cibuildwheel
         with:
           python-version: "3.10"
 
@@ -102,14 +100,6 @@ jobs:
           only: ${{ matrix.identifier }}
         env:
           CIBW_BUILD_VERBOSITY: 1
-
-      - uses: pypa/gh-action-pypi-publish@v1.8.6
-        if: inputs.DO_DEPLOY
-        with:
-          packages-dir: ./wheelhouse
-          password: ${{ secrets.PYPI_API_TOKEN }}
-          repository-url: ${{ inputs.DESTINATION_URL }}
-          skip-existing: ${{ inputs.SKIP_EXISTING }}
 
       - uses: actions/upload-artifact@v3
         with:
@@ -128,29 +118,30 @@ jobs:
       - name: Build sdist
         run: pipx run build --sdist
       
-      - uses: pypa/gh-action-pypi-publish@v1.8.6
-        if: inputs.DO_DEPLOY
-        with:
-          packages-dir: ./dist
-          password: ${{ secrets.PYPI_API_TOKEN }}
-          repository-url: ${{ inputs.DESTINATION_URL }}
-          skip-existing: ${{ inputs.SKIP_EXISTING }}
-
       - uses: actions/upload-artifact@v3
         with:
           path: dist/*.tar.gz
 
-  check_artifact:
-    name: List artifact content
+  upload_pypi:
+    name: Upload to PyPI
     needs: [build_wheels, build_sdist] #TODO final version
     # needs: [build_wheels]
+    if: inputs.DO_DEPLOY
     runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.ENVIRONMENT }}
+      url: https://test.pypi.org/project/ncrystal/ #TODO should be env var, test if it empty
     steps:
       - uses: actions/download-artifact@v3
         with:
-          # unpacks default artifact into dist/
           name: artifact
-          path: dist
+          path: dist #unpacks default artifact into dist/
 
       - name: list artifact content
         run: ls -l dist
+
+      - uses: pypa/gh-action-pypi-publish@v1.8.7
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          repository-url: ${{ inputs.DESTINATION_URL }}
+          skip-existing: ${{ inputs.SKIP_EXISTING }}
