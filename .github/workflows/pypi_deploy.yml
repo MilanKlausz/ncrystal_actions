@@ -94,8 +94,8 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Build wheel #TODO causing macos job to fail for testing
-        if: matrix.os != 'macos-latest' 
+      - name: Build wheel #TODO causing ubuntu jobs to fail for testing
+        if: matrix.os != 'ubuntu-latest' 
         uses: pypa/cibuildwheel@v2.12.3
         with:
           only: ${{ matrix.identifier }}
@@ -127,7 +127,7 @@ jobs:
     name: Upload to PyPI
     needs: [build_wheels, build_sdist] #TODO final version
     # needs: [build_wheels]
-    if: inputs.DO_DEPLOY
+    if: always() && inputs.DO_DEPLOY
     runs-on: ubuntu-latest
     environment:
       name: ${{ inputs.ENVIRONMENT }}
