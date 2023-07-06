@@ -68,12 +68,14 @@ jobs:
                    [{'os': 'macos-latest',  'identifier': i} for i in macos_identifiers]; \
           print(json.dumps(setups));")
           echo "setup_matrix={\"include\":$MATRIX}" >> $GITHUB_OUTPUT
+          echo "setup_nr=$(echo "$MATRIX" | jq length)" >> $GITHUB_OUTPUT
         env:
           CIBW_BUILD: cp39-* #TODO restriction for development
           # CIBW_ARCHS_MACOS: "x86_64 universal2 arm64"
           # CIBW_SKIP: pp* #TODO allow?
     outputs:
       setups: ${{ steps.create-matrix.outputs.setup_matrix }}
+      setupNr: ${{ steps.create-matrix.outputs.setup_nr }}
 
   build_wheels:
     needs: create-matrix
@@ -125,7 +127,7 @@ jobs:
 
   upload_pypi:
     name: Upload to PyPI
-    needs: [build_wheels, build_sdist] #TODO final version
+    needs: [create-matrix, build_wheels, build_sdist] #TODO final version
     # needs: [build_wheels]
     if: always() && inputs.DO_DEPLOY
     runs-on: ubuntu-latest
@@ -154,17 +156,16 @@ jobs:
           local_files=$(ls dist)
           remote_files=$(curl -sX GET "https://test.pypi.org/pypi/ncrystal/${{env.VERSION_NUMBER}}/json" | jq -r '.urls[] | select(.packagetype == "sdist" or .packagetype == "bdist_wheel") | .filename')
 
-          mapfile -t remote_files_array <<< "$remote_files"
           mapfile -t local_files_array <<< "$local_files"
+          mapfile -t remote_files_array <<< "$remote_files"
 
-          sorted_remote_files=($(printf "%s\n" "${remote_files_array[@]}" | sort))
           sorted_local_files=($(printf "%s\n" "${local_files_array[@]}" | sort))
-
-          echo "Remote Files:"
-          printf "%s\n" "${sorted_remote_files[@]}"
+          sorted_remote_files=($(printf "%s\n" "${remote_files_array[@]}" | sort))
           
           echo "Local Files:"
           printf "%s\n" "${sorted_local_files[@]}"
+          echo "Remote Files:"
+          printf "%s\n" "${sorted_remote_files[@]}"
           
           diff=$(comm -3 <(printf "%s\n" "${sorted_remote_files[@]}") <(printf "%s\n" "${sorted_local_files[@]}"))
           
@@ -176,6 +177,15 @@ jobs:
             exit 1
           fi
 
-
-
+      - name: Verify completeness
+        run: |
+          file_count=$(ls -1q dist | wc -l)
+          expected_file_count=$((expected_wheel_number + 1)) #wheels + 1 sdist
+          if [ "$file_count" -ne "$expected_file_count" ]; then
+            echo "Error: File count mismatch. Expected: $expected_file_count, Actual: $file_count"
+            exit 1
+          fi
+          echo "File count verified. Total files: $file_count"
+        env:
+          expected_wheel_number: ${{needs.create-matrix.outputs.setupNr}}
 
