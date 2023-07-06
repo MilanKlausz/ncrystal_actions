@@ -151,8 +151,31 @@ jobs:
 
       - name: Verify upload
         run: |
-          ls -l dist
-          curl -sX GET "https://test.pypi.org/pypi/ncrystal/${{env.VERSION_NUMBER}}/json" | jq -r '.urls[] | select(.packagetype == "bdist_wheel") | .filename'
+          local_files=$(ls dist)
+          remote_files=$(curl -sX GET "https://test.pypi.org/pypi/ncrystal/${{env.VERSION_NUMBER}}/json" | jq -r '.urls[] | select(.packagetype == "sdist" or .packagetype == "bdist_wheel") | .filename')
+
+          mapfile -t remote_files_array <<< "$remote_files"
+          mapfile -t local_files_array <<< "$local_files"
+
+          sorted_remote_files=($(printf "%s\n" "${remote_files_array[@]}" | sort))
+          sorted_local_files=($(printf "%s\n" "${local_files_array[@]}" | sort))
+
+          echo "Remote Files:"
+          printf "%s\n" "${sorted_remote_files[@]}"
+          
+          echo "Local Files:"
+          printf "%s\n" "${sorted_local_files[@]}"
+          
+          diff=$(comm -3 <(printf "%s\n" "${sorted_remote_files[@]}") <(printf "%s\n" "${sorted_local_files[@]}"))
+          
+          if [ -z "$diff" ]; then
+            echo "The list of files is the same."
+          else
+            echo "The following files are different:"
+            printf "%s\n" "$diff"
+            exit 1
+          fi
+
 
 
 
