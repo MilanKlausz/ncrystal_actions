@@ -1,21 +1,6 @@
 name: Build and deploy to PyPI
 
 on:
-  workflow_dispatch: #TODO might not be neede in the end
-    inputs:
-      REPOSITORY:
-        type: string
-        description: The repository to build from
-        default: MilanKlausz/ncrystal_wheels
-      BRANCH:
-        type: string
-        description: The repository branch to use
-        default: master
-      DO_DEPLOY:
-        type: boolean
-        description: Do deploying to PyPI
-        default: false
-
   workflow_call:
     inputs:
       REPOSITORY:
@@ -31,10 +16,6 @@ on:
         type: boolean
         description: Do deploying to PyPI
         default: true
-      DESTINATION_URL:
-        type: string
-        description: URL to upload to
-        required: true
       ENVIRONMENT:
         type: string
         description: GitHub environment to use
@@ -96,8 +77,7 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Build wheel #TODO causing ubuntu jobs to fail for testing
-        # if: matrix.os != 'ubuntu-latest' 
+      - name: Build wheel
         uses: pypa/cibuildwheel@v2.12.3
         with:
           only: ${{ matrix.identifier }}
@@ -120,20 +100,19 @@ jobs:
 
       - name: Build sdist
         run: pipx run build --sdist
-      
+
       - uses: actions/upload-artifact@v3
         with:
           path: dist/*.tar.gz
 
   upload_pypi:
     name: Upload to PyPI
-    needs: [create-matrix, build_wheels, build_sdist] #TODO final version
-    # needs: [build_wheels]
+    needs: [create-matrix, build_wheels, build_sdist]
     if: always() && inputs.DO_DEPLOY
     runs-on: ubuntu-latest
     environment:
       name: ${{ inputs.ENVIRONMENT }}
-      url: https://test.pypi.org/project/ncrystal/ #TODO should be env var, test if it empty
+      url: ${{ vars.PYPI_URL }}
     steps:
       - uses: actions/download-artifact@v3
         with:
@@ -143,32 +122,33 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@v1.8.7
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
-          repository-url: ${{ inputs.DESTINATION_URL }}
+          repository-url: ${{ vars.PYPI_UPLOAD_URL }}
           skip-existing: ${{ inputs.SKIP_EXISTING }}
-      
+
       - name: Get version number from tag
         run: echo "VERSION_NUMBER=${tag:1}" >> $GITHUB_ENV
         env:
           tag: ${{ github.ref_name }}
 
       - name: Verify upload
+        if: ${{ vars.PYPI_QUERY_URL != '' }}
         run: |
           local_files=$(ls dist)
-          remote_files=$(curl -sX GET "https://test.pypi.org/pypi/ncrystal/${{env.VERSION_NUMBER}}/json" | jq -r '.urls[] | select(.packagetype == "sdist" or .packagetype == "bdist_wheel") | .filename')
+          remote_files=$(curl -sX GET "${{ vars.PYPI_QUERY_URL }}/${{env.VERSION_NUMBER}}/json" | jq -r '.urls[] | select(.packagetype == "sdist" or .packagetype == "bdist_wheel") | .filename')
 
           mapfile -t local_files_array <<< "$local_files"
           mapfile -t remote_files_array <<< "$remote_files"
 
           sorted_local_files=($(printf "%s\n" "${local_files_array[@]}" | sort))
           sorted_remote_files=($(printf "%s\n" "${remote_files_array[@]}" | sort))
-          
+
           echo "Local Files:"
           printf "%s\n" "${sorted_local_files[@]}"
           echo "Remote Files:"
           printf "%s\n" "${sorted_remote_files[@]}"
-          
+
           diff=$(comm -3 <(printf "%s\n" "${sorted_remote_files[@]}") <(printf "%s\n" "${sorted_local_files[@]}"))
-          
+
           if [ -z "$diff" ]; then
             echo "The list of files is the same."
           else
