@@ -52,16 +52,16 @@ jobs:
           echo "on_tag=$ON_TAG" >> $GITHUB_OUTPUT
     
       - name: Verify tag version number
-        if: ${{ steps.check-for-tag.outputs.on_tag == '1' }}
+        if: inputs.DO_DEPLOY && steps.check-for-tag.outputs.on_tag == '1'
         run: |
           TAG_VERSION_NUMBER=${TAG:1} #vx.y.z -> x.y.z
           if [[ "$TAG_VERSION_NUMBER" != "$RAW_VERSION_NUMBER" ]]; then
-            echo "ERROR: The version number from the tag($TAG_VERSION_NUMBER) doesn't agree with the version number from the package($RAW_VERSION_NUMBER)!"
+            echo "ERROR: The version number from the tag($TAG_VERSION_NUMBER) doesn't agree with the version number from the package($RAW_VERSION_NUMBER)! This can happen if the branch name is provided as ref insted of a tag."
             exit 1
           fi
         env:
           RAW_VERSION_NUMBER: ${{ steps.version-number.outputs.raw_version_number }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ inputs.REF }}
 
       - name: Install cibuildwheel
         run: pip install cibuildwheel
@@ -167,7 +167,7 @@ jobs:
           skip-existing: ${{ inputs.SKIP_EXISTING }}
 
       - name: Verify upload
-        if: ${{ vars.PYPI_QUERY_URL != '' }}
+        if: vars.PYPI_QUERY_URL != ''
         run: |
           python3 -c "import os,subprocess,json ;\
           local_files = os.listdir('dist') ;\
